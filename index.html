@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>即時累加積分排名表</title>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<style>
+body{font-family:Arial;background:#f2f4f8;padding:20px;}
+h1{text-align:center;}
+table{width:100%;border-collapse:collapse;background:white;}
+th,td{border:1px solid #ccc;padding:8px;text-align:center;}
+th{background:#333;color:white;}
+button{padding:8px 16px;margin:10px;cursor:pointer;}
+.rank1{background:gold;}
+.rank2{background:silver;}
+.rank3{background:#cd7f32;color:white;}
+input{width:60px;text-align:center;}
+.pointsCol{font-weight:bold;color:#1976d2;}
+</style>
+</head>
+<body>
+
+<h1>即時累加積分排名表</h1>
+
+<button onclick="updateAll()">✅ 更新本次分數</button>
+<button onclick="resetAll()">🔒 重設全部 (密碼8888)</button>
+
+<table>
+<thead>
+<tr>
+<th>排名</th>
+<th>該排名積分</th>
+<th>姓名</th>
+<th>隊伍</th>
+<th>累積總分</th>
+<th>本次增加分數</th>
+</tr>
+</thead>
+<tbody id="scoreTable"></tbody>
+</table>
+
+<script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDik4UsOMjmppT22GcRGjGG1GgLPPtvj6Q",
+  authDomain: "fae-ap-pk.firebaseapp.com",
+  databaseURL: "https://fae-ap-pk-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "fae-ap-pk"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const players = [
+["Ian","Ian Team"],["MingLun","Ian Team"],["Kevin","Ian Team"],["Chris","Ian Team"],
+["Cherry","Ian Team"],["Tom","Ian Team"],
+["Shawn","Shawn Team"],["Jacky","Shawn Team"],["Yan","Shawn Team"],
+["Kevon","Shawn Team"],["Sharon","Shawn Team"],["Horace","Shawn Team"],
+["TungTung","TT Team"],["Holly","TT Team"],["Him","TT Team"],
+["Anne","TT Team"],["Mavis","TT Team"],["Mark","TT Team"],["Adam","TT Team"],
+["Ivan","Ivan Team"],["Karmen","Ivan Team"],["Yimk","Ivan Team"],
+["Nicola","Ivan Team"],["Roy","Ivan Team"],["Colline","Ivan Team"],
+["Monica","Mon+Kuen Team"],["Kuen","Mon+Kuen Team"],["Eric","Mon+Kuen Team"],
+["Charlie","Mon+Kuen Team"],["Heison","Mon+Kuen Team"],["Carmen","Mon+Kuen Team"],
+["Simon","Simon+Lance Team"],["Lance","Simon+Lance Team"],["Donald","Simon+Lance Team"],
+["Peter","Simon+Lance Team"],["Vanya","Simon+Lance Team"],["Vivian","Simon+Lance Team"]
+];
+
+// ✅ 排名對應積分 RULES
+const rankPoints = {
+1:50,2:42,3:37,4:33,5:30,6:27,7:24,8:21,9:18,10:15,
+11:13,12:11,13:9,14:7,15:5,16:3,17:3,18:3,19:3,20:3,
+21:2,22:2,23:2,24:2,25:2,
+26:1,27:1,28:1,29:1,30:1,
+31:-1,32:-1,33:-1,
+34:-2,35:-2,36:-2,37:-2
+};
+
+// ✅ 初始化資料
+db.ref("scores").once("value").then(snapshot=>{
+    if(!snapshot.exists()){
+        players.forEach(p=>{
+            db.ref("scores/"+p[0]).set({
+                team:p[1],
+                total:0
+            });
+        });
+    }
+});
+
+// ✅ 即時排名
+db.ref("scores").on("value",snapshot=>{
+    const data = snapshot.val();
+    if(!data) return;
+
+    let arr = [];
+    for(let name in data){
+        arr.push({
+            name:name,
+            team:data[name].team,
+            total:data[name].total
+        });
+    }
+
+    arr.sort((a,b)=>b.total-a.total);
+
+    const table = document.getElementById("scoreTable");
+    table.innerHTML="";
+
+    arr.forEach((p,i)=>{
+        let cls="";
+        if(i==0) cls="rank1";
+        if(i==1) cls="rank2";
+        if(i==2) cls="rank3";
+
+        const rank = i+1;
+        const point = rankPoints[rank] ?? "";
+
+        table.innerHTML+=`
+        <tr class="${cls}">
+            <td>${rank}</td>
+            <td class="pointsCol">${point}</td>
+            <td>${p.name}</td>
+            <td>${p.team}</td>
+            <td>${p.total}</td>
+            <td><input type="number" id="add_${p.name}"></td>
+        </tr>`;
+    });
+});
+
+// ✅ 一鍵更新
+function updateAll(){
+
+    players.forEach(p=>{
+        const name = p[0];
+        const input = document.getElementById("add_"+name);
+        const value = parseFloat(input.value);
+
+        if(!isNaN(value) && value !== 0){
+            db.ref("scores/"+name+"/total").transaction(current=>{
+                return (current||0)+value;
+            });
+        }
+    });
+
+    players.forEach(p=>{
+        document.getElementById("add_"+p[0]).value="";
+    });
+
+    alert("✅ 本次分數已更新");
+}
+
+// ✅ 重設
+function resetAll(){
+    const pwd = prompt("請輸入密碼");
+    if(pwd==="8888"){
+        players.forEach(p=>{
+            db.ref("scores/"+p[0]+"/total").set(0);
+        });
+        alert("已重設");
+    }
+}
+
+</script>
+</body>
+</html>
