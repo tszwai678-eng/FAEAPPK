@@ -52,7 +52,6 @@ input{width:70px;text-align:center;}
 
 <script>
 
-// ✅ Firebase 設定
 const firebaseConfig = {
   apiKey: "AIzaSyDik4UsOMjmppT22GcRGjGG1GgLPPtvj6Q",
   authDomain: "fae-ap-pk.firebaseapp.com",
@@ -63,17 +62,33 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ✅ 排名積分規則
-const rankPoints = {
+// ✅ 原始排名積分表（1–33 名）
+const baseRankPoints = {
 1:50,2:42,3:37,4:33,5:30,6:27,7:24,8:21,9:18,10:15,
 11:13,12:11,13:9,14:7,15:5,16:3,17:3,18:3,19:3,20:3,
 21:2,22:2,23:2,24:2,25:2,
 26:1,27:1,28:1,29:1,30:1,
-31:-1,32:-1,33:-1,
-34:-2,35:-2,36:-2,37:-2
+31:-1,32:-1,33:-1
 };
 
-// ✅ 即時監聽資料
+// ✅ 計算最終排名積分規則
+function getRankPoint(rank,total){
+
+    // 規則2：總分=0 → -2
+    if(total === 0){
+        return -2;
+    }
+
+    // 規則1：34名或以下 → -2
+    if(rank >= 34){
+        return -2;
+    }
+
+    return baseRankPoints[rank] ?? -2;
+}
+
+
+// ✅ 即時監聽
 db.ref("scores").on("value", snapshot => {
 
     const data = snapshot.val();
@@ -102,7 +117,7 @@ db.ref("scores").on("value", snapshot => {
         if(i===2) cls="rank3";
 
         const rank=i+1;
-        const point=rankPoints[rank] ?? "";
+        const point=getRankPoint(rank,p.total);
 
         table.innerHTML += `
         <tr class="${cls}">
@@ -116,6 +131,7 @@ db.ref("scores").on("value", snapshot => {
     });
 
 });
+
 
 // ✅ 更新分數
 function updateAll(){
@@ -146,6 +162,7 @@ function updateAll(){
 
 }
 
+
 // ✅ 新增參賽者
 function addPlayer(){
 
@@ -171,6 +188,7 @@ function addPlayer(){
         }
     });
 }
+
 
 // ✅ 重設
 function resetAll(){
