@@ -1,26 +1,32 @@
 function updateAll(){
 
-    const inputs = document.querySelectorAll("input[type=number]");
-    let updates = {};
+    db.ref("scores").once("value").then(snapshot=>{
+        const data = snapshot.val();
+        if(!data) return;
 
-    inputs.forEach(input=>{
-        const name = input.dataset.name;
-        const value = parseFloat(input.value);
+        let updates = {};
 
-        if(!isNaN(value) && value !== 0){
-            const currentTotal = parseFloat(input.dataset.total) || 0;
-            updates["scores/"+name+"/total"] = currentTotal + value;
+        for(let name in data){
+            const input = document.getElementById("add_"+name);
+            if(!input) continue;
+
+            const value = parseFloat(input.value);
+
+            if(!isNaN(value) && value !== 0){
+                const currentTotal = data[name].total || 0;
+                updates["scores/"+name+"/total"] = currentTotal + value;
+            }
         }
-    });
 
-    if(Object.keys(updates).length === 0){
-        alert("沒有輸入任何分數");
-        return;
-    }
-
-    db.ref().update(updates).then(()=>{
-        document.querySelectorAll("input[type=number]").forEach(i=>i.value="");
-        alert("✅ 本次分數已全部更新");
+        // ✅ 一次性更新全部
+        if(Object.keys(updates).length > 0){
+            db.ref().update(updates).then(()=>{
+                document.querySelectorAll("input[type=number]").forEach(i=>i.value="");
+                alert("✅ 本次分數已全部更新");
+            });
+        }else{
+            alert("沒有輸入任何分數");
+        }
     });
 
 }
