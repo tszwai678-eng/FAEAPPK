@@ -2,32 +2,32 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>即時累加積分排名表</title>
+<title>即時積分排名表</title>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <style>
-body{font-family:Arial;background:#f2f4f8;padding:20px;}
+body{font-family:Arial;background:#f2f4f8;padding:20px;margin:0;}
 h1{text-align:center;}
 table{width:100%;border-collapse:collapse;background:white;margin-top:20px;}
 th,td{border:1px solid #ccc;padding:8px;text-align:center;}
 th{background:#333;color:white;}
-button{padding:8px 16px;margin:5px;cursor:pointer;}
+button{padding:6px 12px;margin:5px;cursor:pointer;}
 .rank1{background:gold;}
 .rank2{background:silver;}
 .rank3{background:#cd7f32;color:white;}
-input{width:80px;text-align:center;padding:4px;}
+input{width:70px;text-align:center;}
 .pointsCol{font-weight:bold;color:#1976d2;}
-.addBox{background:white;padding:15px;border-radius:8px;margin-bottom:10px;}
+.addBox{background:white;padding:15px;border-radius:8px;}
 </style>
 </head>
 <body>
 
-<h1>即時累加積分排名表</h1>
+<h1>即時積分排名表</h1>
 
 <div class="addBox">
-<h3>➕ 新增參賽者</h3>
+<b>➕ 新增參賽者</b><br><br>
 姓名: <input type="text" id="newName">
 隊伍: <input type="text" id="newTeam">
 <button onclick="addPlayer()">新增</button>
@@ -52,6 +52,7 @@ input{width:80px;text-align:center;padding:4px;}
 
 <script>
 
+// ✅ Firebase 設定
 const firebaseConfig = {
   apiKey: "AIzaSyDik4UsOMjmppT22GcRGjGG1GgLPPtvj6Q",
   authDomain: "fae-ap-pk.firebaseapp.com",
@@ -62,7 +63,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ✅ 排名對應積分
+// ✅ 排名積分規則
 const rankPoints = {
 1:50,2:42,3:37,4:33,5:30,6:27,7:24,8:21,9:18,10:15,
 11:13,12:11,13:9,14:7,15:5,16:3,17:3,18:3,19:3,20:3,
@@ -72,57 +73,68 @@ const rankPoints = {
 34:-2,35:-2,36:-2,37:-2
 };
 
-// ✅ 即時排名
-db.ref("scores").on("value",snapshot=>{
+// ✅ 即時監聽資料
+db.ref("scores").on("value", snapshot => {
+
     const data = snapshot.val();
+    const table = document.getElementById("scoreTable");
+    table.innerHTML = "";
+
     if(!data) return;
 
     let arr = [];
+
     for(let name in data){
         arr.push({
-            name:name,
-            team:data[name].team,
-            total:data[name].total
+            name: name,
+            team: data[name].team || "",
+            total: data[name].total || 0
         });
     }
 
-    arr.sort((a,b)=>b.total-a.total);
-
-    const table = document.getElementById("scoreTable");
-    table.innerHTML="";
+    arr.sort((a,b)=> b.total - a.total);
 
     arr.forEach((p,i)=>{
+
         let cls="";
-        if(i==0) cls="rank1";
-        if(i==1) cls="rank2";
-        if(i==2) cls="rank3";
+        if(i===0) cls="rank1";
+        if(i===1) cls="rank2";
+        if(i===2) cls="rank3";
 
         const rank=i+1;
-        const point=rankPoints[rank]??"";
+        const point=rankPoints[rank] ?? "";
 
-        table.innerHTML+=`
+        table.innerHTML += `
         <tr class="${cls}">
             <td>${rank}</td>
             <td class="pointsCol">${point}</td>
             <td>${p.name}</td>
             <td>${p.team}</td>
             <td>${p.total}</td>
-            <td><input type="number" id="add_${p.name}"></td>
+            <td><input type="number" id="add_${p.name.replace(/\s/g,'_')}"></td>
         </tr>`;
     });
+
 });
 
-// ✅ 一鍵更新
+// ✅ 更新分數
 function updateAll(){
+
     db.ref("scores").once("value").then(snapshot=>{
-        const data=snapshot.val();
+        const data = snapshot.val();
+        if(!data) return;
+
         for(let name in data){
-            const input=document.getElementById("add_"+name);
+
+            const safeId = "add_" + name.replace(/\s/g,'_');
+            const input = document.getElementById(safeId);
             if(!input) continue;
-            const value=parseFloat(input.value);
-            if(!isNaN(value)&&value!==0){
+
+            const value = parseFloat(input.value);
+
+            if(!isNaN(value) && value !== 0){
                 db.ref("scores/"+name+"/total").transaction(current=>{
-                    return (current||0)+value;
+                    return (current || 0) + value;
                 });
             }
         }
@@ -132,16 +144,16 @@ function updateAll(){
         document.querySelectorAll("input[type=number]").forEach(i=>i.value="");
     },500);
 
-    alert("✅ 本次分數已更新");
 }
 
-// ✅ 新增參賽者（不影響現有成績）
+// ✅ 新增參賽者
 function addPlayer(){
-    const name=document.getElementById("newName").value.trim();
-    const team=document.getElementById("newTeam").value.trim();
 
-    if(!name||!team){
-        alert("請輸入姓名及隊伍");
+    const name = document.getElementById("newName").value.trim();
+    const team = document.getElementById("newTeam").value.trim();
+
+    if(!name || !team){
+        alert("請輸入姓名與隊伍");
         return;
     }
 
@@ -150,10 +162,10 @@ function addPlayer(){
             alert("此參賽者已存在");
         }else{
             db.ref("scores/"+name).set({
-                team:team,
-                total:0
+                team: team,
+                total: 0
             });
-            alert("✅ 已新增參賽者");
+            alert("✅ 已新增");
             document.getElementById("newName").value="";
             document.getElementById("newTeam").value="";
         }
@@ -162,10 +174,10 @@ function addPlayer(){
 
 // ✅ 重設
 function resetAll(){
-    const pwd=prompt("請輸入密碼");
+    const pwd = prompt("請輸入密碼");
     if(pwd==="8888"){
         db.ref("scores").once("value").then(snapshot=>{
-            const data=snapshot.val();
+            const data = snapshot.val();
             for(let name in data){
                 db.ref("scores/"+name+"/total").set(0);
             }
