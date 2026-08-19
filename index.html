@@ -71,6 +71,17 @@ input{
     padding:15px;
     border-radius:8px;
 }
+
+.deleteBtn{
+    background:#d32f2f;
+    color:white;
+    border:none;
+    border-radius:4px;
+}
+
+.deleteBtn:hover{
+    background:#b71c1c;
+}
 </style>
 </head>
 
@@ -97,6 +108,7 @@ input{
 <th>隊伍</th>
 <th>累積總分</th>
 <th>本次增加分數</th>
+<th>操作</th>
 </tr>
 </thead>
 <tbody id="scoreTable"></tbody>
@@ -157,18 +169,35 @@ const baseRankPoints = {
 // ✅ 計算最終排名積分
 function getRankPoint(rank,total){
 
-    // ✅ 新規則：累積總分 = 0 → -5
+    // ✅ 累積總分 = 0 → -5
     if(total === 0){
         return -5;
     }
 
-    // ✅ 新規則：第 34 名或以下 → -2
+    // ✅ 第 34 名或以下 → -2
     if(rank >= 34){
         return -2;
     }
 
     // ✅ 第 1–33 名照原本積分
     return baseRankPoints[rank] ?? -2;
+}
+
+
+// ✅ Firebase key 安全處理
+function safeKey(name){
+    return name.replace(/[.#$/[\]]/g, "_");
+}
+
+
+// ✅ HTML 顯示安全處理，防止特殊字元造成錯誤
+function escapeHtml(text){
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 
@@ -183,11 +212,12 @@ db.ref("scores").on("value", snapshot => {
 
     let arr = [];
 
-    for(let name in data){
+    for(let key in data){
         arr.push({
-            name: name,
-            team: data[name].team || "",
-            total: data[name].total || 0
+            key: key,
+            name: data[key].name || key,
+            team: data[key].team || "",
+            total: data[key].total || 0
         });
     }
 
@@ -204,16 +234,19 @@ db.ref("scores").on("value", snapshot => {
         const rank=i+1;
         const point=getRankPoint(rank,p.total);
 
-        const safeId = "add_" + p.name.replace(/\s/g,'_');
+        const inputId = "add_" + p.key;
 
         table.innerHTML += `
         <tr class="${cls}">
             <td>${rank}</td>
             <td class="pointsCol">${point}</td>
-            <td>${p.name}</td>
-            <td>${p.team}</td>
+            <td>${escapeHtml(p.name)}</td>
+            <td>${escapeHtml(p.team)}</td>
             <td>${p.total}</td>
-            <td><input type="number" id="${safeId}"></td>
+            <td><input type="number" id="${inputId}"></td>
+            <td>
+                <button class="deleteBtn" onclick="deletePlayer('${p.key}','${escapeHtml(p.name)}')">刪除</button>
+            </td>
         </tr>`;
     });
 
@@ -227,16 +260,16 @@ function updateAll(){
         const data = snapshot.val();
         if(!data) return;
 
-        for(let name in data){
+        for(let key in data){
 
-            const safeId = "add_" + name.replace(/\s/g,'_');
-            const input = document.getElementById(safeId);
+            const inputId = "add_" + key;
+            const input = document.getElementById(inputId);
             if(!input) continue;
 
             const value = parseFloat(input.value);
 
             if(!isNaN(value) && value !== 0){
-                db.ref("scores/"+name+"/total").transaction(current=>{
+                db.ref("scores/"+key+"/total").transaction(current=>{
                     return (current || 0) + value;
                 });
             }
@@ -261,11 +294,14 @@ function addPlayer(){
         return;
     }
 
-    db.ref("scores/"+name).once("value").then(snapshot=>{
+    const key = safeKey(name);
+
+    db.ref("scores/"+key).once("value").then(snapshot=>{
         if(snapshot.exists()){
             alert("此參賽者已存在");
         }else{
-            db.ref("scores/"+name).set({
+            db.ref("scores/"+key).set({
+                name: name,
                 team: team,
                 total: 0
             });
@@ -273,6 +309,32 @@ function addPlayer(){
             document.getElementById("newName").value="";
             document.getElementById("newTeam").value="";
         }
+    });
+}
+
+
+// ✅ 刪除參賽者
+function deletePlayer(key,name){
+
+    const pwd = prompt("請輸入刪除密碼");
+
+    if(pwd !== "8888"){
+        alert("密碼錯誤，已取消刪除");
+        return;
+    }
+
+    const ok = confirm("確定要刪除參賽者：" + name + "？");
+
+    if(!ok){
+        return;
+    }
+
+    db.ref("scores/"+key).remove()
+    .then(()=>{
+        alert("✅ 已刪除：" + name);
+    })
+    .catch(error=>{
+        alert("刪除失敗：" + error.message);
     });
 }
 
@@ -289,8 +351,8 @@ function resetAll(){
             const data = snapshot.val();
             if(!data) return;
 
-            for(let name in data){
-                db.ref("scores/"+name+"/total").set(0);
+            for(let key in data){
+                db.ref("scores/"+key+"/total").set(0);
             }
 
         });
